@@ -1,2 +1,4 @@
 build:
-	go build -o dist cmd/main.go
+	go build -o dist/main cmd/main.go
+run:
+	go run cmd/main.go

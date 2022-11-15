@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
+var timeout = 30
+
 func ReceiveMessageFromQueue(cfg aws.Config, c context.Context, queueName string) {
 	client := sqs.NewFromConfig(cfg)
 	urlResult, err := client.GetQueueUrl(c, &sqs.GetQueueUrlInput{
@@ -20,26 +22,37 @@ func ReceiveMessageFromQueue(cfg aws.Config, c context.Context, queueName string
 		return
 	}
 	queueURL := urlResult.QueueUrl
+	fmt.Println("Retriving message from %s", queueURL)
+	totalMessage := 0
+	for {
+		gMInput := &sqs.ReceiveMessageInput{
+			MessageAttributeNames: []string{
+				string(types.QueueAttributeNameAll),
+			},
+			QueueUrl:            queueURL,
+			MaxNumberOfMessages: 10,
+			VisibilityTimeout:   int32(timeout),
+		}
+		msgResult, err := client.ReceiveMessage(c, gMInput)
+		if err != nil {
+			fmt.Println("Got an error receiving messages:")
+			fmt.Println(err)
+			return
+		}
+		if msgResult.Messages != nil {
+			fmt.Println("Retrieved %d messages, total %d", len(msgResult.Messages), totalMessage)
+			totalMessage += len(msgResult.Messages)
 
-	gMInput := &sqs.ReceiveMessageInput{
-		MessageAttributeNames: []string{
-			string(types.QueueAttributeNameAll),
-		},
-		QueueUrl:            queueURL,
-		MaxNumberOfMessages: 1,
-		// VisibilityTimeout:   int32(*timeout),
-	}
-	msgResult, err := client.ReceiveMessage(c, gMInput)
-	if err != nil {
-		fmt.Println("Got an error receiving messages:")
-		fmt.Println(err)
-		return
-	}
-	if msgResult.Messages != nil {
-		fmt.Println("Message ID:     " + *msgResult.Messages[0].MessageId)
-		fmt.Println("Message Handle: " + *msgResult.Messages[0].ReceiptHandle)
-	} else {
-		fmt.Println("No messages found")
+			for _, msg := range msgResult.Messages {
+				fmt.Println("Message ID:     " + *msg.MessageId)
+				fmt.Println("Message Handle: " + *msg.ReceiptHandle)
+				fmt.Println("Message Body: " + *msg.Body)
+			}
+		} else {
+			fmt.Println("No messages found")
+			fmt.Println("Retrieve %d messages in total.", totalMessage)
+			return
+		}
 	}
 }
 
