@@ -10,15 +10,17 @@ import (
 )
 
 type arguments struct {
-	cmd       string
-	queueName string
+	cmd        string
+	queueName  string
+	outputFile string
 }
 
 func defineFlags() arguments {
 	cmd := flag.String("c", "", "AWS command")
 	queueName := flag.String("q", "", "SQS queue name")
+	outputFile := flag.String("o", "dist/output.json", "Output file")
 	flag.Parse()
-	args := arguments{cmd: *cmd, queueName: *queueName}
+	args := arguments{cmd: *cmd, queueName: *queueName, outputFile: *outputFile}
 	return args
 }
 
@@ -36,5 +38,5 @@ func main() {
 		fmt.Println("Failed to load AWS default config")
 		return
 	}
-	sqs.ReceiveMessageFromQueue(cfg, c, args.queueName)
+	sqs.ReceiveMessageFromQueue(cfg, c, args.queueName, args.outputFile)
 }

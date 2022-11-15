@@ -3,6 +3,7 @@ package sqs
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -11,7 +12,14 @@ import (
 
 var timeout = 30
 
-func ReceiveMessageFromQueue(cfg aws.Config, c context.Context, queueName string) {
+func writeToFile(writer *os.File, line string) {
+	_, err := writer.WriteString(line + "\n")
+	if err != nil {
+		fmt.Println("Failed to write to file", err)
+	}
+}
+
+func ReceiveMessageFromQueue(cfg aws.Config, c context.Context, queueName string, outputFile string) {
 	client := sqs.NewFromConfig(cfg)
 	urlResult, err := client.GetQueueUrl(c, &sqs.GetQueueUrlInput{
 		QueueName: &queueName,
@@ -22,7 +30,13 @@ func ReceiveMessageFromQueue(cfg aws.Config, c context.Context, queueName string
 		return
 	}
 	queueURL := urlResult.QueueUrl
-	fmt.Println("Retriving message from %s", queueURL)
+	fmt.Println("Retriving message from", queueURL)
+
+	file, err := os.Create(outputFile)
+	if err != nil {
+		fmt.Println("Fail to create output file", outputFile, err)
+	}
+
 	totalMessage := 0
 	for {
 		gMInput := &sqs.ReceiveMessageInput{
@@ -40,13 +54,14 @@ func ReceiveMessageFromQueue(cfg aws.Config, c context.Context, queueName string
 			return
 		}
 		if msgResult.Messages != nil {
-			fmt.Println("Retrieved %d messages, total %d", len(msgResult.Messages), totalMessage)
 			totalMessage += len(msgResult.Messages)
+			fmt.Println("Retrieved", len(msgResult.Messages), "messages, total:", totalMessage)
 
 			for _, msg := range msgResult.Messages {
 				fmt.Println("Message ID:     " + *msg.MessageId)
 				fmt.Println("Message Handle: " + *msg.ReceiptHandle)
 				fmt.Println("Message Body: " + *msg.Body)
+				writeToFile(file, *msg.Body)
 			}
 		} else {
 			fmt.Println("No messages found")
@@ -54,8 +69,4 @@ func ReceiveMessageFromQueue(cfg aws.Config, c context.Context, queueName string
 			return
 		}
 	}
-}
-
-func getQueueURL(c context.Context, client *sqs.Client, input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
-	return client.GetQueueUrl(c, input)
 }
